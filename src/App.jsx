@@ -22,11 +22,11 @@ function formatDate(iso) {
 // ── ADD/EDIT EXPENSE MODAL ──────────────────────────────────────────────────
 function ExpenseModal({ initial, onSave, onClose, title, projects }) {
   const defaultProject = projects[0]?.id || null
-  const [form, setForm] = useState(initial || { description: '', amount: '', category: 'Materiallar', projectId: defaultProject })
+  const [form, setForm] = useState(initial || { description: '', amount: '', category: 'Materiallar', project_id: defaultProject })
 
   function handleSave() {
     const amount = parseFloat(String(form.amount).replace(/\s/g, ''))
-    if (!form.description.trim() || !amount || amount <= 0 || !form.projectId) return
+    if (!form.description.trim() || !amount || amount <= 0 || !form.project_id) return
     onSave({ ...form, amount })
   }
 
@@ -42,8 +42,8 @@ function ExpenseModal({ initial, onSave, onClose, title, projects }) {
             {projects.map(p => (
               <button
                 key={p.id}
-                className={`project-option ${form.projectId === p.id ? 'selected' : ''}`}
-                onClick={() => setForm(f => ({ ...f, projectId: p.id }))}
+                className={`project-option ${form.project_id === p.id ? 'selected' : ''}`}
+                onClick={() => setForm(f => ({ ...f, project_id: p.id }))}
               >
                 <span>{p.icon}</span>
                 <span className="project-option-name">{p.name}</span>
@@ -94,7 +94,7 @@ function ExpenseModal({ initial, onSave, onClose, title, projects }) {
           <button
             className="btn-save"
             onClick={handleSave}
-            disabled={!form.description.trim() || !form.amount || !form.projectId}
+            disabled={!form.description.trim() || !form.amount || !form.project_id}
           >
             Saqlash
           </button>
@@ -158,7 +158,7 @@ function AddProjectModal({ onSave, onClose }) {
 
 // ── MAIN APP ────────────────────────────────────────────────────────────────
 export default function App() {
-  const { expenses, addExpense, editExpense, deleteExpense, projects, addProject, deleteProject } = useExpenses()
+  const { expenses, addExpense, editExpense, deleteExpense, projects, addProject, deleteProject, loading } = useExpenses()
 
   const [status, setStatus] = useState('idle')
   const [transcript, setTranscript] = useState('')
@@ -175,7 +175,7 @@ export default function App() {
 
   // expenses filtered by active project
   const projectExpenses = activeProject
-    ? expenses.filter(e => e.projectId === activeProject)
+    ? expenses.filter(e => e.project_id === activeProject)
     : expenses
 
   // further filtered by category
@@ -212,8 +212,8 @@ export default function App() {
         const parsed = await parseExpense(text)
         if (!parsed.amount || parsed.amount <= 0) throw new Error('no amount')
         // use active project or first project
-        const projectId = activeProject || projects[0]?.id || null
-        addExpense({ ...parsed, rawText: text, projectId })
+        const project_id = activeProject || projects[0]?.id || null
+        addExpense({ ...parsed, rawText: text, project_id })
         setStatus('idle'); setTranscript('')
       } catch {
         setErrorMsg("Tushunimsiz. Qaytadan aytib bering."); setStatus('error')
@@ -226,6 +226,13 @@ export default function App() {
   function stopListening() { recognitionRef.current?.stop(); setStatus('idle') }
 
   const activeProjectData = activeProject ? projectMap[activeProject] : null
+
+  if (loading) return (
+    <div className="loading-screen">
+      <div className="loading-spinner" />
+      <span>Yuklanmoqda...</span>
+    </div>
+  )
 
   return (
     <div className="app">
@@ -368,7 +375,7 @@ export default function App() {
         ) : (
           visibleExpenses.map(e => {
             const cat = CAT_MAP[e.category] || CAT_MAP['Boshqa']
-            const proj = projectMap[e.projectId]
+            const proj = projectMap[e.project_id]
             return (
               <div key={e.id} className="expense-card"
                 style={{ '--cat-color': cat.color, '--cat-color-bg': cat.colorBg, '--cat-color-border': cat.colorBorder }}
@@ -404,7 +411,7 @@ export default function App() {
         <ExpenseModal
           title="Xarajat qo'shish"
           projects={projects}
-          initial={{ description: '', amount: '', category: 'Materiallar', projectId: activeProject || projects[0]?.id }}
+          initial={{ description: '', amount: '', category: 'Materiallar', project_id: activeProject || projects[0]?.id }}
           onSave={(data) => { addExpense(data); setShowAddExpense(false) }}
           onClose={() => setShowAddExpense(false)}
         />
@@ -414,7 +421,7 @@ export default function App() {
         <ExpenseModal
           title="Xarajatni tahrirlash"
           projects={projects}
-          initial={{ description: editingExpense.description, amount: editingExpense.amount, category: editingExpense.category, projectId: editingExpense.projectId }}
+          initial={{ description: editingExpense.description, amount: editingExpense.amount, category: editingExpense.category, project_id: editingExpense.project_id }}
           onSave={(data) => { editExpense(editingExpense.id, data); setEditingExpense(null) }}
           onClose={() => setEditingExpense(null)}
         />
@@ -438,7 +445,7 @@ export default function App() {
                   <span className="manage-project-icon">{p.icon}</span>
                   <span className="manage-project-name">{p.name}</span>
                   <span className="manage-project-count">
-                    {expenses.filter(e => e.projectId === p.id).length} ta
+                    {expenses.filter(e => e.project_id === p.id).length} ta
                   </span>
                   <button
                     className="action-btn delete"
