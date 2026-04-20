@@ -1,22 +1,18 @@
 const API_KEY = import.meta.env.VITE_GROQ_KEY
 const API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 
-export async function parseExpense(text) {
+export async function parseExpense(text, categories = ['Materiallar', 'Usta haqi', 'Asboblar', 'Yuk tashish', 'Boshqa']) {
+  const catList = JSON.stringify(categories)
   const prompt = `You are a construction expense parser. Extract expense information from this text spoken in Uzbek or Russian.
 
 Text: "${text}"
 
+Available categories: ${catList}
+
 Return ONLY a JSON object with these fields:
 - amount: number (handle "тысяч/ming" as *1000, "миллион/million" as *1000000)
-- category: one of ["Materiallar", "Usta haqi", "Asboblar", "Yuk tashish", "Boshqa"]
+- category: pick the most relevant from the available categories list above
 - description: short description in the original language (2-5 words)
-
-Category hints:
-- Materiallar: цемент, песок, кирпич, арматура, краска, труба, qum, temir, g'isht, and other building materials
-- Usta haqi: usta, мастер, рабочий, worker payment
-- Asboblar: tool, дрель, болгарка, аппарат
-- Yuk tashish: доставка, перевозка, машина, transport
-- Boshqa: anything else
 
 Examples:
 "цемент 150 тысяч" → {"amount":150000,"category":"Materiallar","description":"Цемент"}

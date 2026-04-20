@@ -2,42 +2,50 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from './supabase'
 
 const USER_ID = 'default'
-const DEFAULT_PROJECTS = [{ id: 1, name: 'Asosiy uy', icon: '🏠' }]
+const DEFAULT_PROJECTS = [{ name: 'Asosiy uy', icon: '🏠' }]
+
+export const BUILT_IN_CATEGORIES = [
+  { id: 'materiallar', name: 'Materiallar', icon: '🧱', color: '#60a5fa', builtIn: true },
+  { id: 'usta',        name: 'Usta haqi',   icon: '👷', color: '#fb923c', builtIn: true },
+  { id: 'asboblar',   name: 'Asboblar',    icon: '🔧', color: '#34d399', builtIn: true },
+  { id: 'yuk',        name: 'Yuk tashish', icon: '🚚', color: '#a78bfa', builtIn: true },
+  { id: 'boshqa',     name: 'Boshqa',      icon: '📦', color: '#f472b6', builtIn: true },
+]
 
 export function useExpenses() {
   const [expenses, setExpenses] = useState([])
   const [projects, setProjects] = useState([])
+  const [customCategories, setCustomCategories] = useState([])
   const [loading, setLoading] = useState(true)
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
-    const [{ data: proj, error: projErr }, { data: exp, error: expErr }] = await Promise.all([
+    const [{ data: proj, error: projErr }, { data: exp, error: expErr }, { data: cats, error: catsErr }] = await Promise.all([
       supabase.from('projects').select('*').eq('user_id', USER_ID).order('id'),
       supabase.from('expenses').select('*').eq('user_id', USER_ID).order('date', { ascending: false }),
+      supabase.from('categories').select('*').eq('user_id', USER_ID).order('id'),
     ])
 
     if (projErr) console.error('projects fetch error:', projErr)
     if (expErr) console.error('expenses fetch error:', expErr)
+    if (catsErr) console.error('categories fetch error:', catsErr)
 
     if (proj && proj.length === 0) {
-      const { data: created, error: seedErr } = await supabase
-        .from('projects')
-        .insert(DEFAULT_PROJECTS.map(p => ({ ...p, user_id: USER_ID })))
-        .select()
-      if (seedErr) console.error('seed error:', seedErr)
-      setProjects(created || DEFAULT_PROJECTS)
+      const { data: created } = await supabase.from('projects')
+        .insert(DEFAULT_PROJECTS.map(p => ({ ...p, user_id: USER_ID }))).select()
+      setProjects(created || [])
     } else {
       setProjects(proj || [])
     }
 
     setExpenses(exp || [])
+    setCustomCategories(cats || [])
     setLoading(false)
   }, [])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
   async function addExpense(expense) {
-    // remove id so Supabase can auto-generate or we use a safe bigint
     const { id, rawText, ...rest } = expense
     const row = { ...rest, raw_text: rawText || null, user_id: USER_ID, date: new Date().toISOString() }
     const { data, error } = await supabase.from('expenses').insert(row).select().single()
@@ -59,11 +67,8 @@ export function useExpenses() {
   }
 
   async function addProject(name, icon) {
-    const { data, error } = await supabase
-      .from('projects')
-      .insert({ name, icon, user_id: USER_ID })
-      .select()
-      .single()
+    const { data, error } = await supabase.from('projects')
+      .insert({ name, icon, user_id: USER_ID }).select().single()
     if (error) { console.error('addProject error:', error); return null }
     if (data) setProjects(prev => [...prev, data])
     return data
@@ -76,5 +81,24 @@ export function useExpenses() {
     setExpenses(prev => prev.filter(e => e.project_id !== id))
   }
 
-  return { expenses, projects, loading, addExpense, editExpense, deleteExpense, addProject, deleteProject }
+  async function addCategory(name, icon, color) {
+    const { data, error } = await supabase.from('categories')
+      .insert({ name, icon, color, user_id: USER_ID }).select().single()
+    if (error) { console.error('addCategory error:', error); return null }
+    if (data) setCustomCategories(prev => [...prev, data])
+    return data
+  }
+
+  async function deleteCategory(id) {
+    const { error } = await supabase.from('categories').delete().eq('id', id)
+    if (error) { console.error('deleteCategory error:', error); return }
+    setCustomCategories(prev => prev.filter(c => c.id !== id))
+  }
+
+  return {
+    expenses, projects, customCategories, loading,
+    addExpense, editExpense, deleteExpense,
+    addProject, deleteProject,
+    addCategory, deleteCategory,
+  }
 }

@@ -1,28 +1,26 @@
 import { useState, useRef } from 'react'
-import { useExpenses } from './useExpenses'
+import { useExpenses, BUILT_IN_CATEGORIES } from './useExpenses'
 import { parseExpense } from './gemini'
 import './App.css'
 
-const CATEGORIES = [
-  { key: 'Materiallar', icon: '🧱', color: '#60a5fa', colorBg: 'rgba(96,165,250,0.1)',  colorBorder: 'rgba(96,165,250,0.2)' },
-  { key: 'Usta haqi',   icon: '👷', color: '#fb923c', colorBg: 'rgba(251,146,60,0.1)',  colorBorder: 'rgba(251,146,60,0.2)' },
-  { key: 'Asboblar',    icon: '🔧', color: '#34d399', colorBg: 'rgba(52,211,153,0.1)',  colorBorder: 'rgba(52,211,153,0.2)' },
-  { key: 'Yuk tashish', icon: '🚚', color: '#a78bfa', colorBg: 'rgba(167,139,250,0.1)', colorBorder: 'rgba(167,139,250,0.2)' },
-  { key: 'Boshqa',      icon: '📦', color: '#f472b6', colorBg: 'rgba(244,114,182,0.1)', colorBorder: 'rgba(244,114,182,0.2)' },
-]
-const CAT_MAP = Object.fromEntries(CATEGORIES.map(c => [c.key, c]))
-
 const PROJECT_ICONS = ['🏠','🏗️','🏢','🏡','🏬','🏭','🛖','🏰','🏚️','🏘️','🌳','🚗']
+const CATEGORY_ICONS = ['🧱','👷','🔧','🚚','📦','⚡','🪟','🚿','🎨','🪵','🏗️','💡','🔩','🪣','🛁','🌿']
+const CATEGORY_COLORS = ['#60a5fa','#fb923c','#34d399','#a78bfa','#f472b6','#facc15','#f87171','#38bdf8','#4ade80','#e879f9']
 
 function formatAmount(n) { return new Intl.NumberFormat('uz-UZ').format(n) }
 function formatDate(iso) {
   return new Date(iso).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' })
 }
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16)
+  return `${r},${g},${b}`
+}
 
-// ── ADD/EDIT EXPENSE MODAL ──────────────────────────────────────────────────
-function ExpenseModal({ initial, onSave, onClose, title, projects }) {
-  const defaultProject = projects[0]?.id || null
-  const [form, setForm] = useState(initial || { description: '', amount: '', category: 'Materiallar', project_id: defaultProject })
+// ── EXPENSE MODAL ────────────────────────────────────────────────────────────
+function ExpenseModal({ initial, onSave, onClose, title, projects, allCategories }) {
+  const [form, setForm] = useState(initial || {
+    description: '', amount: '', category: allCategories[0]?.name || '', project_id: projects[0]?.id || null
+  })
 
   function handleSave() {
     const amount = parseFloat(String(form.amount).replace(/\s/g, ''))
@@ -40,11 +38,9 @@ function ExpenseModal({ initial, onSave, onClose, title, projects }) {
           <label className="form-label">Loyiha</label>
           <div className="project-select-grid">
             {projects.map(p => (
-              <button
-                key={p.id}
+              <button key={p.id}
                 className={`project-option ${form.project_id === p.id ? 'selected' : ''}`}
-                onClick={() => setForm(f => ({ ...f, project_id: p.id }))}
-              >
+                onClick={() => setForm(f => ({ ...f, project_id: p.id }))}>
                 <span>{p.icon}</span>
                 <span className="project-option-name">{p.name}</span>
               </button>
@@ -54,36 +50,26 @@ function ExpenseModal({ initial, onSave, onClose, title, projects }) {
 
         <div className="form-group">
           <label className="form-label">Tavsif</label>
-          <input
-            className="form-input"
-            placeholder="Masalan: Цемент М400"
-            value={form.description}
-            onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-          />
+          <input className="form-input" placeholder="Masalan: Цемент М400"
+            value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
         </div>
 
         <div className="form-group">
           <label className="form-label">Summa (so'm)</label>
-          <input
-            className="form-input"
-            type="number"
-            placeholder="150000"
-            value={form.amount}
-            onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
-          />
+          <input className="form-input" type="number" placeholder="150000"
+            value={form.amount} onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} />
         </div>
 
         <div className="form-group">
           <label className="form-label">Kategoriya</label>
           <div className="category-grid">
-            {CATEGORIES.map(c => (
-              <button
-                key={c.key}
-                className={`cat-option ${form.category === c.key ? 'selected' : ''}`}
-                onClick={() => setForm(f => ({ ...f, category: c.key }))}
-              >
+            {allCategories.map(c => (
+              <button key={c.name}
+                className={`cat-option ${form.category === c.name ? 'selected' : ''}`}
+                style={form.category === c.name ? { background: c.color, borderColor: 'transparent' } : {}}
+                onClick={() => setForm(f => ({ ...f, category: c.name }))}>
                 <span className="cat-emoji">{c.icon}</span>
-                {c.key}
+                {c.name}
               </button>
             ))}
           </div>
@@ -91,11 +77,8 @@ function ExpenseModal({ initial, onSave, onClose, title, projects }) {
 
         <div className="modal-actions">
           <button className="btn-cancel" onClick={onClose}>Bekor</button>
-          <button
-            className="btn-save"
-            onClick={handleSave}
-            disabled={!form.description.trim() || !form.amount || !form.project_id}
-          >
+          <button className="btn-save" onClick={handleSave}
+            disabled={!form.description.trim() || !form.amount || !form.project_id}>
             Saqlash
           </button>
         </div>
@@ -104,81 +87,115 @@ function ExpenseModal({ initial, onSave, onClose, title, projects }) {
   )
 }
 
-// ── ADD PROJECT MODAL ───────────────────────────────────────────────────────
+// ── ADD PROJECT MODAL ────────────────────────────────────────────────────────
 function AddProjectModal({ onSave, onClose }) {
   const [name, setName] = useState('')
   const [icon, setIcon] = useState('🏠')
-
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="modal">
         <div className="modal-handle" />
         <h2>Yangi loyiha</h2>
-
         <div className="form-group">
           <label className="form-label">Nom</label>
-          <input
-            className="form-input"
-            placeholder="Masalan: 1-xonadon"
-            value={name}
-            onChange={e => setName(e.target.value)}
-            autoFocus
-          />
+          <input className="form-input" placeholder="Masalan: 1-xonadon"
+            value={name} onChange={e => setName(e.target.value)} autoFocus />
         </div>
-
         <div className="form-group">
           <label className="form-label">Belgi</label>
           <div className="icon-grid">
             {PROJECT_ICONS.map(ic => (
-              <button
-                key={ic}
-                className={`icon-option ${icon === ic ? 'selected' : ''}`}
-                onClick={() => setIcon(ic)}
-              >
-                {ic}
-              </button>
+              <button key={ic} className={`icon-option ${icon === ic ? 'selected' : ''}`}
+                onClick={() => setIcon(ic)}>{ic}</button>
             ))}
           </div>
         </div>
-
         <div className="modal-actions">
           <button className="btn-cancel" onClick={onClose}>Bekor</button>
-          <button
-            className="btn-save"
-            onClick={() => name.trim() && onSave(name.trim(), icon)}
-            disabled={!name.trim()}
-          >
-            Yaratish
-          </button>
+          <button className="btn-save" onClick={() => name.trim() && onSave(name.trim(), icon)}
+            disabled={!name.trim()}>Yaratish</button>
         </div>
       </div>
     </div>
   )
 }
 
-// ── MAIN APP ────────────────────────────────────────────────────────────────
+// ── ADD CATEGORY MODAL ───────────────────────────────────────────────────────
+function AddCategoryModal({ onSave, onClose }) {
+  const [name, setName] = useState('')
+  const [icon, setIcon] = useState('📌')
+  const [color, setColor] = useState('#a78bfa')
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal">
+        <div className="modal-handle" />
+        <h2>Yangi kategoriya</h2>
+        <div className="form-group">
+          <label className="form-label">Nom</label>
+          <input className="form-input" placeholder="Masalan: Santexnika"
+            value={name} onChange={e => setName(e.target.value)} autoFocus />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Belgi</label>
+          <div className="icon-grid">
+            {CATEGORY_ICONS.map(ic => (
+              <button key={ic} className={`icon-option ${icon === ic ? 'selected' : ''}`}
+                onClick={() => setIcon(ic)}>{ic}</button>
+            ))}
+          </div>
+        </div>
+        <div className="form-group">
+          <label className="form-label">Rang</label>
+          <div className="color-grid">
+            {CATEGORY_COLORS.map(c => (
+              <button key={c} className={`color-option ${color === c ? 'selected' : ''}`}
+                style={{ background: c }} onClick={() => setColor(c)} />
+            ))}
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="btn-cancel" onClick={onClose}>Bekor</button>
+          <button className="btn-save" onClick={() => name.trim() && onSave(name.trim(), icon, color)}
+            disabled={!name.trim()}>Yaratish</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── MAIN APP ─────────────────────────────────────────────────────────────────
 export default function App() {
-  const { expenses, addExpense, editExpense, deleteExpense, projects, addProject, deleteProject, loading } = useExpenses()
+  const {
+    expenses, projects, customCategories, loading,
+    addExpense, editExpense, deleteExpense,
+    addProject, deleteProject,
+    addCategory, deleteCategory,
+  } = useExpenses()
 
   const [status, setStatus] = useState('idle')
   const [transcript, setTranscript] = useState('')
   const [errorMsg, setErrorMsg] = useState('')
-  const [activeProject, setActiveProject] = useState(null) // null = all projects
+  const [activeProject, setActiveProject] = useState(null)
   const [catFilter, setCatFilter] = useState('Hammasi')
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [editingExpense, setEditingExpense] = useState(null)
   const [showAddProject, setShowAddProject] = useState(false)
   const [showManageProjects, setShowManageProjects] = useState(false)
+  const [showAddCategory, setShowAddCategory] = useState(false)
+  const [showManageCategories, setShowManageCategories] = useState(false)
   const recognitionRef = useRef(null)
 
+  // merge built-in + custom categories
+  const allCategories = [
+    ...BUILT_IN_CATEGORIES,
+    ...customCategories.map(c => ({ ...c, name: c.name, builtIn: false })),
+  ]
+  const catMap = Object.fromEntries(allCategories.map(c => [c.name, c]))
   const projectMap = Object.fromEntries(projects.map(p => [p.id, p]))
 
-  // expenses filtered by active project
   const projectExpenses = activeProject
     ? expenses.filter(e => e.project_id === activeProject)
     : expenses
-
-  // further filtered by category
   const visibleExpenses = catFilter === 'Hammasi'
     ? projectExpenses
     : projectExpenses.filter(e => e.category === catFilter)
@@ -189,29 +206,24 @@ export default function App() {
     return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
   }).reduce((s, e) => s + e.amount, 0)
 
-  // category breakdown for active project
-  const catTotals = CATEGORIES.map(c => ({
+  const catTotals = allCategories.map(c => ({
     ...c,
-    total: projectExpenses.filter(e => e.category === c.key).reduce((s, e) => s + e.amount, 0),
+    total: projectExpenses.filter(e => e.category === c.name).reduce((s, e) => s + e.amount, 0),
   })).filter(c => c.total > 0)
 
   function startListening() {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     if (!SR) { setErrorMsg("Brauzeringiz ovozni tanimaydi."); setStatus('error'); return }
     const rec = new SR()
-    rec.lang = 'ru-RU'
-    rec.continuous = false
-    rec.interimResults = false
+    rec.lang = 'ru-RU'; rec.continuous = false; rec.interimResults = false
     recognitionRef.current = rec
     setStatus('listening'); setTranscript(''); setErrorMsg('')
-
     rec.onresult = async (e) => {
       const text = e.results[0][0].transcript
       setTranscript(text); setStatus('processing')
       try {
-        const parsed = await parseExpense(text)
+        const parsed = await parseExpense(text, allCategories.map(c => c.name))
         if (!parsed.amount || parsed.amount <= 0) throw new Error('no amount')
-        // use active project or first project
         const project_id = activeProject || projects[0]?.id || null
         addExpense({ ...parsed, rawText: text, project_id })
         setStatus('idle'); setTranscript('')
@@ -237,29 +249,22 @@ export default function App() {
   return (
     <div className="app">
 
-      {/* ── HEADER ── */}
+      {/* HEADER */}
       <div className="header">
         <div className="header-top">
           <h1>🏗️ Qurilish</h1>
-          <div className="header-actions">
-            <button className="add-manual-btn" onClick={() => setShowAddExpense(true)} title="Xarajat qo'shish">+</button>
-          </div>
+          <button className="add-manual-btn" onClick={() => setShowAddExpense(true)}>+</button>
         </div>
 
-        {/* Project tabs */}
         <div className="project-tabs">
-          <button
-            className={`project-tab ${activeProject === null ? 'active' : ''}`}
-            onClick={() => { setActiveProject(null); setCatFilter('Hammasi') }}
-          >
+          <button className={`project-tab ${activeProject === null ? 'active' : ''}`}
+            onClick={() => { setActiveProject(null); setCatFilter('Hammasi') }}>
             🌐 Hammasi
           </button>
           {projects.map(p => (
-            <button
-              key={p.id}
+            <button key={p.id}
               className={`project-tab ${activeProject === p.id ? 'active' : ''}`}
-              onClick={() => { setActiveProject(p.id); setCatFilter('Hammasi') }}
-            >
+              onClick={() => { setActiveProject(p.id); setCatFilter('Hammasi') }}>
               {p.icon} {p.name}
             </button>
           ))}
@@ -268,7 +273,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Stats */}
         <div className="stats-grid">
           <div className="stat-card main">
             <div className="stat-label">
@@ -286,24 +290,20 @@ export default function App() {
           </div>
         </div>
 
-        {/* Category breakdown bar */}
         {catTotals.length > 0 && total > 0 && (
           <div className="breakdown">
             <div className="breakdown-bar">
               {catTotals.map(c => (
-                <div
-                  key={c.key}
-                  className="breakdown-segment"
+                <div key={c.name} className="breakdown-segment"
                   style={{ width: `${(c.total / total) * 100}%`, background: c.color }}
-                  title={`${c.key}: ${formatAmount(c.total)}`}
-                />
+                  title={`${c.name}: ${formatAmount(c.total)}`} />
               ))}
             </div>
             <div className="breakdown-legend">
               {catTotals.map(c => (
-                <div key={c.key} className="legend-item">
+                <div key={c.name} className="legend-item">
                   <span className="legend-dot" style={{ background: c.color }} />
-                  <span>{c.icon} {c.key}</span>
+                  <span>{c.icon} {c.name}</span>
                   <span className="legend-amount">{formatAmount(c.total)}</span>
                 </div>
               ))}
@@ -311,31 +311,30 @@ export default function App() {
           </div>
         )}
 
-        {/* Manage projects link */}
-        {projects.length > 0 && (
+        <div className="manage-links">
           <button className="manage-projects-btn" onClick={() => setShowManageProjects(true)}>
-            Loyihalarni boshqarish →
+            Loyihalar →
           </button>
-        )}
+          <button className="manage-projects-btn" onClick={() => setShowManageCategories(true)}>
+            Kategoriyalar →
+          </button>
+        </div>
       </div>
 
-      {/* ── MIC ── */}
+      {/* MIC */}
       <div className="mic-section">
         <div className={`mic-ring ${status === 'listening' ? 'active' : ''}`}>
           {status === 'idle' || status === 'error' ? (
             <button className="mic-btn" onClick={startListening}>
-              <span className="mic-icon">🎤</span>
-              <span>Gapiring</span>
+              <span className="mic-icon">🎤</span><span>Gapiring</span>
             </button>
           ) : status === 'listening' ? (
             <button className="mic-btn listening" onClick={stopListening}>
-              <span className="mic-icon">🔴</span>
-              <span>Tinglayapman</span>
+              <span className="mic-icon">🔴</span><span>Tinglayapman</span>
             </button>
           ) : (
             <button className="mic-btn processing" disabled>
-              <span className="mic-icon spin">⚙️</span>
-              <span>Ishlamoqda</span>
+              <span className="mic-icon spin">⚙️</span><span>Ishlamoqda</span>
             </button>
           )}
         </div>
@@ -352,20 +351,22 @@ export default function App() {
         {status === 'error' && <div className="error-msg">{errorMsg}</div>}
       </div>
 
-      {/* ── CATEGORY FILTER ── */}
+      {/* FILTER */}
       <div className="filter-bar">
-        {['Hammasi', ...CATEGORIES.map(c => c.key)].map(c => (
-          <button
-            key={c}
-            className={`filter-btn ${catFilter === c ? 'active' : ''}`}
-            onClick={() => setCatFilter(c)}
-          >
-            {c !== 'Hammasi' ? CAT_MAP[c].icon + ' ' : ''}{c}
-          </button>
-        ))}
+        {['Hammasi', ...allCategories.map(c => c.name)].map(c => {
+          const cat = catMap[c]
+          return (
+            <button key={c}
+              className={`filter-btn ${catFilter === c ? 'active' : ''}`}
+              style={catFilter === c && cat ? { background: cat.color, borderColor: 'transparent' } : {}}
+              onClick={() => setCatFilter(c)}>
+              {cat ? cat.icon + ' ' : ''}{c}
+            </button>
+          )
+        })}
       </div>
 
-      {/* ── EXPENSE LIST ── */}
+      {/* LIST */}
       <div className="expenses-list">
         {visibleExpenses.length === 0 ? (
           <div className="empty">
@@ -374,12 +375,16 @@ export default function App() {
           </div>
         ) : (
           visibleExpenses.map(e => {
-            const cat = CAT_MAP[e.category] || CAT_MAP['Boshqa']
+            const cat = catMap[e.category] || BUILT_IN_CATEGORIES[4]
             const proj = projectMap[e.project_id]
+            const rgb = cat.color?.startsWith('#') ? hexToRgb(cat.color) : '167,139,250'
             return (
               <div key={e.id} className="expense-card"
-                style={{ '--cat-color': cat.color, '--cat-color-bg': cat.colorBg, '--cat-color-border': cat.colorBorder }}
-              >
+                style={{
+                  '--cat-color': cat.color,
+                  '--cat-color-bg': `rgba(${rgb},0.1)`,
+                  '--cat-color-border': `rgba(${rgb},0.2)`,
+                }}>
                 <div className="expense-left">
                   <div className="expense-icon-wrap">{cat.icon}</div>
                   <div className="expense-info">
@@ -396,8 +401,8 @@ export default function App() {
                 <div className="expense-right">
                   <span className="expense-amount">{formatAmount(e.amount)}</span>
                   <div className="expense-actions">
-                    <button className="action-btn edit" onClick={() => setEditingExpense(e)} title="Tahrirlash">✏️</button>
-                    <button className="action-btn delete" onClick={() => deleteExpense(e.id)} title="O'chirish">🗑️</button>
+                    <button className="action-btn edit" onClick={() => setEditingExpense(e)}>✏️</button>
+                    <button className="action-btn delete" onClick={() => deleteExpense(e.id)}>🗑️</button>
                   </div>
                 </div>
               </div>
@@ -406,32 +411,31 @@ export default function App() {
         )}
       </div>
 
-      {/* ── MODALS ── */}
+      {/* MODALS */}
       {showAddExpense && (
-        <ExpenseModal
-          title="Xarajat qo'shish"
-          projects={projects}
-          initial={{ description: '', amount: '', category: 'Materiallar', project_id: activeProject || projects[0]?.id }}
-          onSave={(data) => { addExpense(data); setShowAddExpense(false) }}
-          onClose={() => setShowAddExpense(false)}
-        />
+        <ExpenseModal title="Xarajat qo'shish" projects={projects} allCategories={allCategories}
+          initial={{ description: '', amount: '', category: allCategories[0]?.name, project_id: activeProject || projects[0]?.id }}
+          onSave={data => { addExpense(data); setShowAddExpense(false) }}
+          onClose={() => setShowAddExpense(false)} />
       )}
 
       {editingExpense && (
-        <ExpenseModal
-          title="Xarajatni tahrirlash"
-          projects={projects}
+        <ExpenseModal title="Xarajatni tahrirlash" projects={projects} allCategories={allCategories}
           initial={{ description: editingExpense.description, amount: editingExpense.amount, category: editingExpense.category, project_id: editingExpense.project_id }}
-          onSave={(data) => { editExpense(editingExpense.id, data); setEditingExpense(null) }}
-          onClose={() => setEditingExpense(null)}
-        />
+          onSave={data => { editExpense(editingExpense.id, data); setEditingExpense(null) }}
+          onClose={() => setEditingExpense(null)} />
       )}
 
       {showAddProject && (
         <AddProjectModal
           onSave={(name, icon) => { addProject(name, icon); setShowAddProject(false) }}
-          onClose={() => setShowAddProject(false)}
-        />
+          onClose={() => setShowAddProject(false)} />
+      )}
+
+      {showAddCategory && (
+        <AddCategoryModal
+          onSave={(name, icon, color) => { addCategory(name, icon, color); setShowAddCategory(false) }}
+          onClose={() => setShowAddCategory(false)} />
       )}
 
       {showManageProjects && (
@@ -444,23 +448,47 @@ export default function App() {
                 <div key={p.id} className="manage-project-row">
                   <span className="manage-project-icon">{p.icon}</span>
                   <span className="manage-project-name">{p.name}</span>
-                  <span className="manage-project-count">
-                    {expenses.filter(e => e.project_id === p.id).length} ta
-                  </span>
-                  <button
-                    className="action-btn delete"
-                    onClick={() => {
-                      if (confirm(`"${p.name}" loyihasini va uning barcha xarajatlarini o'chirasizmi?`)) {
-                        deleteProject(p.id)
-                        if (activeProject === p.id) setActiveProject(null)
-                      }
-                    }}
-                  >🗑️</button>
+                  <span className="manage-project-count">{expenses.filter(e => e.project_id === p.id).length} ta</span>
+                  <button className="action-btn delete" onClick={() => {
+                    if (confirm(`"${p.name}" o'chirilsinmi?`)) {
+                      deleteProject(p.id)
+                      if (activeProject === p.id) setActiveProject(null)
+                    }
+                  }}>🗑️</button>
                 </div>
               ))}
             </div>
-            <button className="btn-save" style={{width:'100%', marginTop:16}} onClick={() => { setShowManageProjects(false); setShowAddProject(true) }}>
-              + Yangi loyiha qo'shish
+            <button className="btn-save" style={{width:'100%',marginTop:16}}
+              onClick={() => { setShowManageProjects(false); setShowAddProject(true) }}>
+              + Yangi loyiha
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showManageCategories && (
+        <div className="modal-overlay" onClick={e => e.target === e.currentTarget && setShowManageCategories(false)}>
+          <div className="modal">
+            <div className="modal-handle" />
+            <h2>Kategoriyalar</h2>
+            <div className="manage-projects-list">
+              {allCategories.map(c => (
+                <div key={c.name} className="manage-project-row">
+                  <span className="manage-project-icon">{c.icon}</span>
+                  <span className="manage-project-name">{c.name}</span>
+                  <span className="legend-dot" style={{ background: c.color, width:10, height:10, borderRadius:'50%', flexShrink:0 }} />
+                  {c.builtIn
+                    ? <span style={{fontSize:11,color:'#44446a'}}>standart</span>
+                    : <button className="action-btn delete" onClick={() => {
+                        if (confirm(`"${c.name}" o'chirilsinmi?`)) deleteCategory(c.id)
+                      }}>🗑️</button>
+                  }
+                </div>
+              ))}
+            </div>
+            <button className="btn-save" style={{width:'100%',marginTop:16}}
+              onClick={() => { setShowManageCategories(false); setShowAddCategory(true) }}>
+              + Yangi kategoriya
             </button>
           </div>
         </div>

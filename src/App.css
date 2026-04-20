@@ -789,6 +789,36 @@ body {
   padding: 1px 6px;
 }
 
+/* ── COLOR PICKER ── */
+.color-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.color-option {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.color-option.selected {
+  border-color: #fff;
+  transform: scale(1.15);
+  box-shadow: 0 0 10px rgba(255,255,255,0.3);
+}
+
+/* ── MANAGE LINKS ── */
+.manage-links {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
 /* ── MIC PROJECT HINT ── */
 .mic-project-hint {
   font-size: 12px;
