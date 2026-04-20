@@ -20,10 +20,11 @@ export function useExpenses() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
+    try {
     const [{ data: proj, error: projErr }, { data: exp, error: expErr }, { data: cats, error: catsErr }] = await Promise.all([
       supabase.from('projects').select('*').eq('user_id', USER_ID).order('id'),
       supabase.from('expenses').select('*').eq('user_id', USER_ID).order('date', { ascending: false }),
-      supabase.from('categories').select('*').eq('user_id', USER_ID).order('id'),
+      supabase.from('categories').select('*').eq('user_id', USER_ID).order('id').then(r => r).catch(() => ({ data: [], error: null })),
     ])
 
     if (projErr) console.error('projects fetch error:', projErr)
@@ -40,7 +41,11 @@ export function useExpenses() {
 
     setExpenses(exp || [])
     setCustomCategories(cats || [])
-    setLoading(false)
+    } catch (err) {
+      console.error('fetchAll error:', err)
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
   useEffect(() => { fetchAll() }, [fetchAll])
