@@ -50,6 +50,28 @@ export function useExpenses() {
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('realtime-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, payload => {
+        if (payload.eventType === 'INSERT') setExpenses(prev => [payload.new, ...prev])
+        if (payload.eventType === 'UPDATE') setExpenses(prev => prev.map(e => e.id === payload.new.id ? payload.new : e))
+        if (payload.eventType === 'DELETE') setExpenses(prev => prev.filter(e => e.id !== payload.old.id))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, payload => {
+        if (payload.eventType === 'INSERT') setProjects(prev => [...prev, payload.new])
+        if (payload.eventType === 'UPDATE') setProjects(prev => prev.map(p => p.id === payload.new.id ? payload.new : p))
+        if (payload.eventType === 'DELETE') setProjects(prev => prev.filter(p => p.id !== payload.old.id))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, payload => {
+        if (payload.eventType === 'INSERT') setCustomCategories(prev => [...prev, payload.new])
+        if (payload.eventType === 'DELETE') setCustomCategories(prev => prev.filter(c => c.id !== payload.old.id))
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
   async function addExpense(expense) {
     const { id, rawText, ...rest } = expense
     const row = { ...rest, raw_text: rawText || null, user_id: USER_ID, date: new Date().toISOString() }
