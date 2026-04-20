@@ -1,0 +1,13 @@
+{
+  "name": "Qurilish Xarajatlari",
+  "short_name": "Xarajat",
+  "description": "Qurilish xarajatlarini kuzatish",
+  "theme_color": "#080812",
+  "background_color": "#080812",
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
